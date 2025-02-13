@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Instagram Engagement Prediction</title>
+    <style>
+        /* General styles */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f9;
+        }
+
+        .container {
+            width: 50%;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+
+        form {
+            display: flex;
+            flex-direction: column;
+        }
+
+        label {
+            margin: 10px 0 5px;
+        }
+
+        input, textarea {
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        button {
+            padding: 12px 20px;
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+
+        button:hover:not(:disabled) {
+            background-color: #45a049;
+        }
+
+        .warning {
+            color: red;
+            font-size: 14px;
+            display: none;
+        }
+
+        .result-card {
+            padding: 20px;
+            margin-top: 30px;
+            text-align: center;
+            border-radius: 8px;
+            color: #fff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Styling for different engagement levels */
+        .low { border: 3px solid red; background-color: red; }
+        .medium { border: 3px solid orange; background-color: orange; }
+        .high { border: 3px solid green; background-color: green; }
+
+        .icon {
+            font-size: 50px;
+            margin-bottom: 15px;
+        }
+
+        .result-card h2 { font-size: 24px; margin: 10px 0; }
+        .result-card p { font-size: 20px; }
+
+        /* Caption and hashtag length counters */
+        .counter {
+            font-size: 12px;
+            color: #777;
+            text-align: right;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Predict Engagement Category for an Instagram Post</h1>
+        
+        <form action="/predict" method="POST" onsubmit="return validateForm()">
+            <label for="caption">Caption:</label>
+            <textarea id="caption" name="caption" required placeholder="Enter the caption here..." oninput="updateFormValidation()">{{ request.form['caption'] if request.form.get('caption') else '' }}</textarea>
+            <div id="caption-length" class="counter">{{ request.form['caption']|length if request.form.get('caption') else 0 }} characters</div> 
+            <p id="caption-warning" class="warning">Caption must be at least 50 characters long.</p>
+
+            <label for="hashtags">Hashtags:</label>
+            <input type="text" id="hashtags" name="hashtags" required placeholder="Enter hashtags by space" value="{{ request.form['hashtags'] if request.form.get('hashtags') else '' }}" oninput="updateFormValidation()">
+            <div id="hashtag-length" class="counter">{{ request.form['hashtags']|length if request.form.get('hashtags') else 0 }} characters</div>  
+
+            <label for="hour">Hour (0-23):</label>
+            <input type="number" id="hour" name="hour" min="0" max="23" required value="{{ request.form['hour'] if request.form.get('hour') else '' }}" oninput="updateFormValidation()">
+            
+            <label for="day">Day of the week:</label>
+            <input type="text" id="day" name="day" required placeholder="Enter day of the week (e.g., Monday)" value="{{ request.form['day'] if request.form.get('day') else '' }}" oninput="updateFormValidation()">
+            
+            <label for="month">Month (1-12):</label>
+            <input type="number" id="month" name="month" min="1" max="12" required value="{{ request.form['month'] if request.form.get('month') else '' }}" oninput="updateFormValidation()">
+            
+            <label for="year">Year:</label>
+            <input type="number" id="year" name="year" required value="{{ request.form['year'] if request.form.get('year') else '' }}" oninput="updateFormValidation()">
+            
+            <label for="caption_length">Caption Length:</label>
+            <input type="number" id="caption_length" name="caption_length" required readonly value="{{ request.form['caption_length'] if request.form.get('caption_length') else 0 }}">
+            
+            <label for="num_hashtags">Hashtag Length:</label>
+            <input type="number" id="num_hashtags" name="num_hashtags" required readonly value="{{ request.form['num_hashtags'] if request.form.get('num_hashtags') else 0 }}">
+            
+            <button type="submit" id="submit-btn" disabled>Predict</button>
+        </form>
+
+        {% if predicted_engagement %}
+        <div class="result-card {{ predicted_engagement.lower() }}">
+            <div class="icon">
+                {% if predicted_engagement == 'low' %}
+                <span>&#x1F622;</span>  <!-- Sad face for low -->
+                {% elif predicted_engagement == 'medium' %}
+                <span>&#x1F610;</span>  <!-- Neutral face for medium -->
+                {% else %}
+                <span>&#x1F60D;</span>  <!-- Heart eyes for high -->
+                {% endif %}
+            </div>
+            <h2>Predicted Engagement Category:</h2>
+            <p>{{ predicted_engagement | capitalize }}</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <script>
+        function updateFormValidation() {
+            const caption = document.getElementById('caption').value;
+            const hashtags = document.getElementById('hashtags').value;
+            const hour = document.getElementById('hour').value;
+            const day = document.getElementById('day').value;
+            const month = document.getElementById('month').value;
+            const year = document.getElementById('year').value;
+            const submitButton = document.getElementById('submit-btn');
+
+            const captionWarning = document.getElementById('caption-warning');
+
+            // Update caption length
+            document.getElementById('caption-length').textContent = caption.length + " characters";
+            document.getElementById('caption_length').value = caption.length;
+
+            // Update hashtag length
+            document.getElementById('hashtag-length').textContent = hashtags.length + " characters";
+            document.getElementById('num_hashtags').value = hashtags.length;
+
+            // Validate fields
+            if (caption.length < 50 || hashtags.trim() === "" || hour === "" || day.trim() === "" || month === "" || year === "") {
+                captionWarning.style.display = caption.length < 50 ? 'block' : 'none';
+                submitButton.disabled = true;
+            } else {
+                captionWarning.style.display = 'none';
+                submitButton.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>
